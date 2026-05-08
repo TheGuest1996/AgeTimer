@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time Widget</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,opsz,wght@0,9..40,200;0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,200&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --glass-bg: rgba(255,255,255,0.06);
+    --glass-border: rgba(255,255,255,0.18);
+    --glass-shine: rgba(255,255,255,0.10);
+    --glass-shadow: rgba(0,0,0,0.45);
+    --text-primary: rgba(255,255,255,0.95);
+    --text-secondary: rgba(255,255,255,0.5);
+    --text-muted: rgba(255,255,255,0.28);
+    --accent-a: #a78bfa;
+    --accent-b: #38bdf8;
+    --accent-c: #fb7185;
+    --accent-d: #34d399;
+  }
+
+  html, body {
+    min-height: 100vh;
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    background: #070b14;
+    color: var(--text-primary);
+    overflow-x: hidden;
+  }
+
+  /* Aurora background */
+  .aurora {
+    position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  }
+  .aurora::before, .aurora::after, .aurora i {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.35;
+    animation: drift 18s ease-in-out infinite alternate;
+  }
+  .aurora::before {
+    width: 60vw; height: 60vh;
+    background: radial-gradient(ellipse, #4f46e5 0%, transparent 70%);
+    top: -10%; left: -10%;
+    animation-duration: 20s;
+  }
+  .aurora::after {
+    width: 50vw; height: 50vh;
+    background: radial-gradient(ellipse, #0ea5e9 0%, transparent 70%);
+    bottom: -5%; right: -5%;
+    animation-duration: 25s; animation-delay: -8s;
+  }
+  .aurora i { display: block; }
+  .aurora i:nth-child(1) {
+    width: 40vw; height: 40vh;
+    background: radial-gradient(ellipse, #ec4899 0%, transparent 70%);
+    top: 30%; left: 40%;
+    animation-duration: 22s; animation-delay: -4s;
+  }
+  .aurora i:nth-child(2) {
+    width: 35vw; height: 35vh;
+    background: radial-gradient(ellipse, #10b981 0%, transparent 70%);
+    bottom: 20%; left: 10%;
+    animation-duration: 28s; animation-delay: -12s;
+  }
+  @keyframes drift {
+    0% { transform: translate(0,0) scale(1); }
+    33% { transform: translate(3%,5%) scale(1.08); }
+    66% { transform: translate(-4%,2%) scale(0.95); }
+    100% { transform: translate(2%,-4%) scale(1.04); }
+  }
+
+  /* Noise overlay for depth */
+  .noise {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+  }
+
+  /* Layout */
+  .app {
+    position: relative; z-index: 2;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start;
+    padding: 40px 20px 60px;
+    gap: 20px;
+  }
+
+  /* Glass card */
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    backdrop-filter: blur(48px) saturate(180%);
+    -webkit-backdrop-filter: blur(48px) saturate(180%);
+    box-shadow:
+      0 1px 0 0 var(--glass-shine) inset,
+      0 -1px 0 0 rgba(0,0,0,0.2) inset,
+      0 24px 64px var(--glass-shadow),
+      0 4px 16px rgba(0,0,0,0.25);
+    position: relative;
+    overflow: hidden;
+  }
+  .glass::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  }
+
+  /* Setup screen */
+  .setup-card {
+    width: 100%; max-width: 420px;
+    padding: 36px 36px 32px;
+    margin-top: 40px;
+  }
+  .setup-title {
+    font-size: 22px; font-weight: 300; letter-spacing: -0.3px;
+    margin-bottom: 6px;
+  }
+  .setup-subtitle {
+    font-size: 14px; color: var(--text-secondary);
+    margin-bottom: 32px; font-weight: 300;
+  }
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 8px;
+  }
+  .field input, .field select {
+    width: 100%; padding: 12px 14px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-family: inherit; font-size: 15px;
+    outline: none; transition: border-color 0.2s, background 0.2s;
+    appearance: none; -webkit-appearance: none;
+  }
+  .field input:focus, .field select:focus {
+    border-color: rgba(167,139,250,0.6);
+    background: rgba(167,139,250,0.08);
+  }
+  .field select option { background: #1a1a2e; }
+  .btn-primary {
+    width: 100%; padding: 13px;
+    background: linear-gradient(135deg, rgba(167,139,250,0.7), rgba(56,189,248,0.7));
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 12px;
+    color: white; font-family: inherit; font-size: 15px; font-weight: 400;
+    cursor: pointer; transition: all 0.2s; margin-top: 8px;
+    backdrop-filter: blur(8px);
+  }
+  .btn-primary:hover { transform: translateY(-1px); filter: brightness(1.15); }
+  .btn-primary:active { transform: scale(0.98); }
+
+  /* Main widget */
+  .widget-wrap { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* Header bar */
+  .header-card { padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; border-radius: 20px; }
+  .header-info { display: flex; flex-direction: column; gap: 2px; }
+  .header-name { font-size: 13px; color: var(--text-secondary); font-weight: 300; }
+  .header-age { font-size: 12px; color: var(--text-muted); }
+  .btn-reset {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px; color: var(--text-muted); font-family: inherit;
+    font-size: 11px; padding: 5px 10px; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-reset:hover { color: var(--text-secondary); background: rgba(255,255,255,0.12); }
+
+  /* Mode tabs */
+  .tabs { display: flex; gap: 6px; padding: 6px; background: rgba(0,0,0,0.3); border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); }
+  .tab {
+    flex: 1; padding: 8px 6px; border-radius: 10px;
+    background: transparent; border: none;
+    color: var(--text-muted); font-family: inherit; font-size: 12px;
+    cursor: pointer; transition: all 0.25s; font-weight: 400;
+    white-space: nowrap;
+  }
+  .tab.active {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-primary);
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  /* Main display */
+  .main-card { padding: 40px 36px 36px; text-align: center; border-radius: 24px; }
+
+  .display-label {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 20px; font-weight: 500;
+  }
+
+  .big-number {
+    font-family: 'DM Mono', monospace;
+    font-size: clamp(32px, 6vw, 56px);
+    font-weight: 300;
+    letter-spacing: -2px;
+    line-height: 1;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #e2e8f0, #a78bfa, #38bdf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer 4s ease-in-out infinite;
+    background-size: 200% 100%;
+  }
+  @keyframes shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  .unit-switcher { display: flex; gap: 6px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+  .unit-btn {
+    padding: 5px 12px; border-radius: 20px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-muted); font-family: 'DM Mono', monospace; font-size: 11px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .unit-btn.active {
+    background: rgba(167,139,250,0.2); border-color: rgba(167,139,250,0.5);
+    color: var(--accent-a);
+  }
+
+  .sub-label { font-size: 13px; color: var(--text-secondary); margin-top: 8px; font-weight: 300; }
+  .fraction-bar {
+    width: 100%; height: 4px; background: rgba(255,255,255,0.06);
+    border-radius: 99px; margin: 28px 0 12px; overflow: hidden;
+  }
+  .fraction-fill {
+    height: 100%; border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+    transition: width 1s cubic-bezier(0.4,0,0.2,1);
+  }
+  .fraction-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+
+  /* Milestones grid */
+  .milestones-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .milestone-item {
+    padding: 16px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    text-align: left;
+  }
+  .milestone-age {
+    font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
+  }
+  .milestone-days {
+    font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 300; letter-spacing: -0.5px; margin-bottom: 3px;
+  }
+  .milestone-days.past { color: rgba(255,255,255,0.25); }
+  .milestone-days.next { color: var(--accent-a); }
+  .milestone-sub { font-size: 11px; color: var(--text-muted); }
+
+  /* City life */
+  .city-intro { margin-bottom: 24px; }
+  .city-name { font-size: 22px; font-weight: 300; margin-bottom: 4px; }
+  .city-stat { font-size: 13px; color: var(--text-secondary); font-weight: 300; }
+
+  .life-ring { position: relative; margin: 20px auto; width: 160px; height: 160px; }
+  .life-ring svg { transform: rotate(-90deg); }
+  .ring-track { fill: none; stroke: rgba(255,255,255,0.06); }
+  .ring-fill { fill: none; stroke-linecap: round; transition: stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1); }
+  .ring-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .ring-pct { font-family: 'DM Mono', monospace; font-size: 28px; font-weight: 300; }
+  .ring-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; }
+  .stat-box {
+    padding: 14px 10px; text-align: center;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;
+  }
+  .stat-val { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 300; margin-bottom: 4px; }
+  .stat-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* Pulse dot */
+  .pulse-wrap { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 24px; }
+  .pulse-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--accent-d);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(52,211,153,0.4); }
+    50% { opacity: 0.7; transform: scale(0.85); box-shadow: 0 0 0 5px rgba(52,211,153,0); }
+  }
+  .pulse-text { font-size: 11px; color: var(--text-muted); letter-spacing: 0.06em; }
+
+  /* Searchable preset list */
+  .preset-list {
+    max-height: 240px; overflow-y: auto; margin-top: 6px;
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;
+    background: rgba(0,0,0,0.25);
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent;
+  }
+  .preset-list::-webkit-scrollbar { width: 4px; }
+  .preset-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+  .preset-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 14px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.12s; gap: 10px;
+  }
+  .preset-item:last-child { border-bottom: none; }
+  .preset-item:hover, .preset-item.focused { background: rgba(167,139,250,0.12); }
+  .preset-item-name { font-size: 13px; color: var(--text-primary); font-weight: 300; }
+  .preset-item-date { font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; white-space: nowrap; }
+  .preset-cat {
+    font-size: 9px; padding: 2px 6px; border-radius: 20px; white-space: nowrap; font-weight: 500;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .cat-birthday { background: rgba(167,139,250,0.2); color: var(--accent-a); }
+  .cat-days     { background: rgba(56,189,248,0.2);  color: var(--accent-b); }
+  .cat-seconds  { background: rgba(251,113,133,0.2); color: var(--accent-c); }
+  .cat-hours    { background: rgba(52,211,153,0.2);  color: var(--accent-d); }
+  .cat-weeks    { background: rgba(251,191,36,0.2);  color: #fbbf24; }
+  .cat-months   { background: rgba(249,115,22,0.2);  color: #fb923c; }
+  .cat-special  { background: rgba(236,72,153,0.2);  color: #f472b6; }
+  .cat-calendar { background: rgba(99,102,241,0.2);  color: #818cf8; }
+
+  .preset-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
+  .ai-resolved-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.25);
+    border-radius: 10px;
+  }
+  .ai-resolved-bar span { font-size: 12px; color: var(--accent-a); }
+  .btn-clear-ai {
+    background: none; border: none; color: var(--text-muted); cursor: pointer;
+    font-size: 11px; font-family: inherit; padding: 2px 6px;
+  }
+  .btn-clear-ai:hover { color: var(--text-secondary); }
+
+  /* Milestone add row */
+  .milestone-add-row { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+
+  /* Custom countdown */
+  .countdown-setup { margin-bottom: 24px; text-align: left; }
+  .countdown-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .countdown-event {
+    font-size: 14px; color: var(--text-secondary); font-style: italic; font-weight: 300;
+  }
+
+  .cd-breakdown {
+    display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap;
+  }
+  .cd-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; min-width: 58px;
+  }
+  .cd-chip-num {
+    font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 300; line-height: 1;
+  }
+  .cd-chip-lbl { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .btn-sm {
+    padding: 12px 16px; background: rgba(167,139,250,0.2); border: 1px solid rgba(167,139,250,0.4);
+    border-radius: 12px; color: var(--accent-a); font-family: inherit; font-size: 13px;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .btn-sm:hover { background: rgba(167,139,250,0.3); }
+
+  .hidden { display: none; }
+
+  .screen { display: none; }
+  .screen.active { display: flex; flex-direction: column; align-items: center; width: 100%; }
+</style>
+</head>
+<body>
+<div class="aurora"><i></i><i></i></div>
+<div class="noise"></div>
+
+<div class="app">
+
+  <!-- SETUP SCREEN -->
+  <div id="setupScreen" class="screen active">
+    <div class="glass setup-card">
+      <div class="setup-title">Time, measured honestly.</div>
+      <div class="setup-subtitle">Enter your details to begin.</div>
+
+      <div class="field">
+        <label>Your birthday</label>
+        <input type="date" id="birthdayInput" max="">
+      </div>
+      <div class="field">
+        <label>Your city (for life expectancy)</label>
+        <select id="citySelect">
+          <option value="">— choose a city —</option>
+        </select>
+      </div>
+      <button class="btn-primary" onclick="startWidget()">Begin ↗</button>
+    </div>
+  </div>
+
+  <!-- MAIN WIDGET SCREEN -->
+  <div id="widgetScreen" class="screen">
+    <div class="widget-wrap">
+
+      <!-- Header -->
+      <div class="glass header-card">
+        <div class="header-info">
+          <div class="header-name" id="headerCity"></div>
+          <div class="header-age" id="headerAge"></div>
+        </div>
+        <div class="pulse-wrap" style="margin:0">
+          <div class="pulse-dot"></div>
+          <span class="pulse-text">Live</span>
+        </div>
+        <button class="btn-reset" onclick="resetWidget()">Reset</button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs glass" style="border-radius:16px">
+        <button class="tab active" onclick="switchTab('counter',this)">Age Counter</button>
+        <button class="tab" onclick="switchTab('milestones',this)">Milestones</button>
+        <button class="tab" onclick="switchTab('city',this)">City Life</button>
+        <button class="tab" onclick="switchTab('countdown',this)">Countdown</button>
+      </div>
+
+      <!-- AGE COUNTER TAB -->
+      <div id="tab-counter" class="glass main-card">
+        <div class="display-label">You have been alive for</div>
+        <div class="big-number" id="counterNumber">0</div>
+        <div class="unit-switcher">
+          <button class="unit-btn active" onclick="setUnit('seconds',this)">seconds</button>
+          <button class="unit-btn" onclick="setUnit('minutes',this)">minutes</button>
+          <button class="unit-btn" onclick="setUnit('hours',this)">hours</button>
+          <button class="unit-btn" onclick="setUnit('days',this)">days</button>
+          <button class="unit-btn" onclick="setUnit('weeks',this)">weeks</button>
+          <button class="unit-btn" onclick="setUnit('months',this)">months</button>
+        </div>
+        <div class="sub-label" id="counterSub"></div>
+      </div>
+
+      <!-- MILESTONES TAB -->
+      <div id="tab-milestones" class="glass main-card hidden">
+        <div class="display-label">Life milestones</div>
+
+        <!-- Add custom milestone -->
+        <div class="milestone-add-row">
+          <input type="number" id="milestoneAgeInput" placeholder="Any age, e.g. 16" min="0" max="150"
+            onkeydown="if(event.key==='Enter') addMilestone()"
+            style="flex:1;padding:9px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;outline:none;">
+          <button onclick="addMilestone()" class="btn-sm" style="padding:9px 14px;font-size:12px">+ Add</button>
+        </div>
+
+        <div class="milestones-grid" id="milestonesGrid"></div>
+        <div class="fraction-bar" style="margin-top:20px">
+          <div class="fraction-fill" id="lifeFill" style="width:0%"></div>
+        </div>
+        <div class="fraction-labels">
+          <span>born</span>
+          <span id="lifePercent">0% lived</span>
+          <span>100</span>
+        </div>
+      </div>
+
+      <!-- CITY LIFE TAB -->
+      <div id="tab-city" class="glass main-card hidden">
+        <div class="display-label">Life expectancy</div>
+        <div class="city-intro">
+          <div class="city-name" id="cityLifeName"></div>
+          <div class="city-stat" id="cityLifeStat"></div>
+        </div>
+        <div class="life-ring">
+          <svg viewBox="0 0 160 160" width="160" height="160">
+            <circle class="ring-track" cx="80" cy="80" r="68" stroke-width="10"/>
+            <circle class="ring-fill" id="ringFill" cx="80" cy="80" r="68" stroke-width="10"
+              stroke="url(#ringGrad)" stroke-dasharray="427" stroke-dashoffset="427"/>
+            <defs>
+              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#a78bfa"/>
+                <stop offset="100%" stop-color="#38bdf8"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="ring-center">
+            <div class="ring-pct" id="ringPct">0%</div>
+            <div class="ring-label">lived</div>
+          </div>
+        </div>
+        <div class="stats-row">
+          <div class="stat-box">
+            <div class="stat-val" id="cityYearsLived"></div>
+            <div class="stat-lbl">years lived</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="cityYearsLeft"></div>
+            <div class="stat-lbl">years left*</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val" id="cityDaysLeft"></div>
+            <div class="stat-lbl">days left*</div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:16px;font-style:italic">*Based on city average life expectancy. Every life is its own story.</div>
+      </div>
+
+      <!-- COUNTDOWN TAB -->
+      <div id="tab-countdown" class="glass main-card hidden">
+        <div class="display-label">Countdown to</div>
+
+        <!-- Setup form -->
+        <div class="countdown-setup" id="cdSetup">
+
+          <div class="field">
+            <label>Search or pick a milestone</label>
+            <input type="text" id="cdSearchInput"
+              placeholder="Try: 50th, 1000 days, billion seconds, death, retirement…"
+              oninput="filterPresets(this.value)"
+              onkeydown="onSearchKey(event)"
+              autocomplete="off">
+          </div>
+
+          <div id="presetList" class="preset-list"></div>
+
+          <!-- Confirmed selection -->
+          <div id="cdManualFields" style="display:none;margin-top:14px">
+            <div class="ai-resolved-bar">
+              <span id="aiResolvedLabel"></span>
+              <button onclick="clearSelection()" class="btn-clear-ai">✕ clear</button>
+            </div>
+            <div class="countdown-fields" style="margin-top:10px">
+              <div class="field" style="margin:0">
+                <label>Name</label>
+                <input type="text" id="eventName" placeholder="Event name">
+              </div>
+              <div class="field" style="margin:0">
+                <label>Date</label>
+                <input type="date" id="targetDate">
+              </div>
+            </div>
+            <button class="btn-sm" style="width:100%;margin-top:10px" onclick="setCountdown()">Set countdown ↗</button>
+          </div>
+
+        </div>
+
+        <!-- Live countdown display -->
+        <div id="cdDisplay" style="display:none">
+
+          <!-- Event label + edit -->
+          <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:20px">
+            <div class="countdown-event" id="cdEventLabel"></div>
+            <button onclick="resetCountdown()" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:var(--text-muted);font-family:inherit;font-size:10px;padding:3px 8px;cursor:pointer;">change</button>
+          </div>
+
+          <!-- Big number display -->
+          <div class="big-number" id="cdBigNumber">0</div>
+
+          <!-- d/h/m/s breakdown -->
+          <div class="cd-breakdown" id="cdBreakdown"></div>
+
+          <!-- Progress bar -->
+          <div class="fraction-bar" style="margin-top:22px">
+            <div class="fraction-fill" id="cdFill" style="width:0%;background:linear-gradient(90deg,#fb7185,#a78bfa)"></div>
+          </div>
+          <div class="fraction-labels">
+            <span id="cdStartLabel">today</span>
+            <span id="cdPctLabel">0%</span>
+            <span id="cdEndLabel">—</span>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CITIES = [
+  ["Tokyo","Japan",84.3],["Hong Kong","China",85.1],["Singapore","Singapore",83.9],
+  ["Zurich","Switzerland",83.7],["Barcelona","Spain",83.2],["Sydney","Australia",83.0],
+  ["Melbourne","Australia",82.8],["Rome","Italy",82.8],["Vancouver","Canada",82.5],
+  ["Stockholm","Sweden",82.4],["Paris","France",82.4],["Toronto","Canada",82.3],
+  ["London","UK",81.9],["Oslo","Norway",82.6],["Copenhagen","Denmark",81.8],
+  ["Amsterdam","Netherlands",81.7],["Vienna","Austria",81.6],["Helsinki","Finland",81.5],
+  ["Berlin","Germany",80.9],["Los Angeles","USA",80.0],["Seoul","South Korea",82.7],
+  ["Shanghai","China",80.3],["New York","USA",79.1],["Madrid","Spain",83.4],
+  ["Dublin","Ireland",81.4],["Athens","Greece",81.0],["Brussels","Belgium",81.3],
+  ["Chicago","USA",77.7],["Houston","USA",77.3],["Phoenix","USA",79.4],
+  ["Bangkok","Thailand",75.5],["Kuala Lumpur","Malaysia",75.0],["Dubai","UAE",77.8],
+  ["Istanbul","Turkey",76.4],["Mexico City","Mexico",76.9],["Buenos Aires","Argentina",76.1],
+  ["São Paulo","Brazil",72.8],["Rio de Janeiro","Brazil",73.0],
+  ["Beijing","China",77.3],["Jakarta","Indonesia",71.4],["Manila","Philippines",71.1],
+  ["Mumbai","India",69.7],["Delhi","India",68.2],["Moscow","Russia",71.3],
+  ["Cairo","Egypt",72.0],["Nairobi","Kenya",67.3],["Lagos","Nigeria",63.0],
+  ["Dhaka","Bangladesh",72.7],["Karachi","Pakistan",65.8],["Cape Town","South Africa",64.2],
+];
+
+let birthday = null;
+let selectedCity = null;
+let currentUnit = 'seconds';
+let currentTab = 'counter';
+let ticker = null;
+let countdownTarget = null;
+let countdownName = '';
+let cdUnit = 'minutes'; // default unit for countdown display
+
+// ── Searchable mega-preset list ───────────────────────────────
+let allPresets = [];
+let focusedIdx = -1;
+
+function buildPresets() {
+  allPresets = [];
+  function fmt(d) { return d.toISOString().split('T')[0]; }
+  function dateStr(d) {
+    return d.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
+  }
+  function ordinal(n) {
+    const s = ['th','st','nd','rd'], v = n % 100;
+    return n + (s[(v-20)%10] || s[v] || s[0]);
+  }
+
+  // ── Birthdays 0–150
+  for (let age = 0; age <= 150; age++) {
+    const d = age === 0 ? new Date(birthday) : new Date(birthday.getTime() + age * 365.25 * 86400 * 1000);
+    const label = age === 0 ? 'Birth (Age 0)' : `${ordinal(age)} Birthday`;
+    allPresets.push({
+      label, cat: 'birthday',
+      search: `${age} birthday turn ${ordinal(age)} born birth`,
+      date: fmt(d), displayDate: dateStr(d)
+    });
+  }
+
+  // ── Days alive: every 100 up to 1000, every 500 up to 10000, every 1000 up to 50000
+  const daySet = new Set();
+  for (let d = 100; d <= 1000; d += 100) daySet.add(d);
+  for (let d = 1500; d <= 10000; d += 500) daySet.add(d);
+  for (let d = 11000; d <= 50000; d += 1000) daySet.add(d);
+  [365, 730, 1095, 1826, 3650, 7300, 9125, 18250, 36500].forEach(d => daySet.add(d));
+  [...daySet].sort((a,b)=>a-b).forEach(days => {
+    const d = new Date(birthday.getTime() + days * 86400 * 1000);
+    allPresets.push({
+      label: `${days.toLocaleString()} Days Alive`,
+      cat: 'days',
+      search: `${days} days alive old day`,
+      date: fmt(d), displayDate: dateStr(d)
+    });
+  });
+
+  // ── Hours alive: round thousands
+  [1000,2000,5000,8760,10000,17520,25000,50000,100000,200000,500000,1000000].forEach(h => {
+    const d = new Date(birthday.getTime() + h * 3600 * 1000);
+    const lbl = h >= 1000000 ? `${(h/1e6).toLocaleString()} Million Hours` : `${h.toLocaleString()} Hours`;
+    allPresets.push({
+      label: `${lbl} Alive`,
+      cat: 'hours',
+      search: `${h} hours alive old hour`,
+      date: fmt(d), displayDate: dateStr(d)
+    });
+  });
+
+  // ── Weeks alive
+  [52,100,200,260,500,520,1000,1040,2000,2600,5000].forEach(w => {
+    const d = new Date(birthday.getTime() + w * 7 * 86400 * 1000);
+    allPresets.push({
+      label: `${w.toLocaleString()} Weeks Alive`,
+      cat: 'weeks',
+      search: `${w} weeks alive old week`,
+      date: fmt(d), displayDate: dateStr(d)
+    });
+  });
+
+  // ── Months alive
+  [6,12,18,24,36,48,60,72,84,96,120,180,240,300,360,480,600,720,840,960,1080,1200,1500,1800].forEach(m => {
+    const d = new Date(birthday.getTime() + m * 30.4375 * 86400 * 1000);
+    allPresets.push({
+      label: `${m} Months Alive`,
+      cat: 'months',
+      search: `${m} months alive old month`,
+      date: fmt(d), displayDate: dateStr(d)
+    });
+  });
+
+  // ── Seconds alive
+  const secPresets = [
+    [1e6,'1 Million'],[1e7,'10 Million'],[5e7,'50 Million'],
+    [1e8,'100 Million'],[2.5e8,'250 Million'],[5e8,'500 Million'],
+    [7.5e8,'750 Million'],[1e9,'1 Billion'],[1.5e9,'1.5 Billion'],
+    [2e9,'2 Billion'],[3e9,'3 Billion']
+  ];
+  secPresets.forEach(([secs, lbl]) => {
+    const d = new Date(birthday.getTime() + secs * 1000);
+    allPresets.push({
+      label: `${lbl} Seconds Alive`,
+      cat: 'seconds',
+      search: `${lbl.toLowerCase()} ${secs} seconds alive old second`,
+      date: fmt(d), displayDate: dateStr(d)
+    });
+  });
+
+  // ── Special
+  const deathDate = new Date(birthday.getTime() + selectedCity.exp * 365.25 * 86400 * 1000);
+  allPresets.push({
+    label: `Expected Death (${selectedCity.name}, ${selectedCity.exp}y avg)`,
+    cat: 'special',
+    search: 'death die expected lifespan end mortality',
+    date: fmt(deathDate), displayDate: dateStr(deathDate)
+  });
+  const retireDate = new Date(birthday.getTime() + 65 * 365.25 * 86400 * 1000);
+  allPresets.push({
+    label: 'Retirement at 65',
+    cat: 'special',
+    search: 'retire retirement 65',
+    date: fmt(retireDate), displayDate: dateStr(retireDate)
+  });
+
+  // ── Calendar
+  const now = new Date();
+  const yr = now.getFullYear();
+  const nyDate = new Date(yr+1, 0, 1);
+  let xmasDate = new Date(yr, 11, 25);
+  if (xmasDate <= now) xmasDate = new Date(yr+1, 11, 25);
+  allPresets.push({
+    label: `New Year's Day ${nyDate.getFullYear()}`,
+    cat: 'calendar',
+    search: 'new year january 1',
+    date: fmt(nyDate), displayDate: dateStr(nyDate)
+  });
+  allPresets.push({
+    label: `Christmas ${xmasDate.getFullYear()}`,
+    cat: 'calendar',
+    search: 'christmas december 25 xmas',
+    date: fmt(xmasDate), displayDate: dateStr(xmasDate)
+  });
+}
+
+function filterPresets(query) {
+  focusedIdx = -1;
+  const list = document.getElementById('presetList');
+  const q = query.toLowerCase().trim();
+
+  const matched = q === ''
+    ? allPresets.slice(0, 40)
+    : allPresets.filter(p =>
+        p.label.toLowerCase().includes(q) ||
+        p.search.toLowerCase().includes(q)
+      ).slice(0, 60);
+
+  if (matched.length === 0) {
+    list.innerHTML = `<div class="preset-empty">No match — try "50th", "1000 days", "billion seconds", "death"…</div>`;
+    return;
+  }
+
+  list.innerHTML = matched.map((p, i) => `
+    <div class="preset-item" data-idx="${i}" onclick="selectPreset(${allPresets.indexOf(p)})">
+      <div>
+        <div class="preset-item-name">${p.label}</div>
+        <div class="preset-item-date">${p.displayDate}</div>
+      </div>
+      <span class="preset-cat cat-${p.cat}">${p.cat}</span>
+    </div>
+  `).join('');
+}
+
+function onSearchKey(e) {
+  const items = document.querySelectorAll('.preset-item');
+  if (e.key === 'ArrowDown') {
+    focusedIdx = Math.min(focusedIdx + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('focused', i === focusedIdx));
+    items[focusedIdx]?.scrollIntoView({ block: 'nearest' });
+    e.preventDefault();
+  } else if (e.key === 'ArrowUp') {
+    focusedIdx = Math.max(focusedIdx - 1, 0);
+    items.forEach((el, i) => el.classList.toggle('focused', i === focusedIdx));
+    items[focusedIdx]?.scrollIntoView({ block: 'nearest' });
+    e.preventDefault();
+  } else if (e.key === 'Enter' && focusedIdx >= 0) {
+    items[focusedIdx]?.click();
+  }
+}
+
+function selectPreset(idx) {
+  const p = allPresets[idx];
+  document.getElementById('eventName').value = p.label;
+  document.getElementById('targetDate').value = p.date;
+  document.getElementById('aiResolvedLabel').textContent = `✦ ${p.label} — ${p.displayDate}`;
+  document.getElementById('cdManualFields').style.display = 'block';
+  document.getElementById('presetList').style.display = 'none';
+  document.getElementById('cdSearchInput').style.display = 'none';
+}
+
+function clearSelection() {
+  document.getElementById('cdManualFields').style.display = 'none';
+  document.getElementById('presetList').style.display = 'block';
+  document.getElementById('cdSearchInput').style.display = 'block';
+  document.getElementById('cdSearchInput').value = '';
+  filterPresets('');
+}
+
+function setCountdown() {
+  const name = document.getElementById('eventName').value.trim() || 'that moment';
+  const date = document.getElementById('targetDate').value;
+  if (!date) { alert('Pick a target date.'); return; }
+  countdownTarget = new Date(date + 'T00:00:00');
+  countdownName = name;
+
+  document.getElementById('cdSetup').style.display = 'none';
+  document.getElementById('cdDisplay').style.display = 'block';
+  document.getElementById('cdEventLabel').textContent = `"${name}"`;
+
+  const endFmt = countdownTarget.toLocaleDateString('en-AU', { year:'numeric', month:'short', day:'numeric' });
+  document.getElementById('cdEndLabel').textContent = endFmt;
+  document.getElementById('cdStartLabel').textContent = new Date().toLocaleDateString('en-AU', { month:'short', day:'numeric' });
+
+  updateCountdownTick();
+}
+
+function resetCountdown() {
+  countdownTarget = null;
+  document.getElementById('cdDisplay').style.display = 'none';
+  document.getElementById('cdSetup').style.display = 'block';
+  document.getElementById('cdManualFields').style.display = 'none';
+  document.getElementById('presetList').style.display = 'block';
+  document.getElementById('cdSearchInput').style.display = 'block';
+  document.getElementById('cdSearchInput').value = '';
+  document.getElementById('eventName').value = '';
+  document.getElementById('targetDate').value = '';
+  filterPresets('');
+}
+
+function setCdUnit(unit, btn) {
+  cdUnit = unit;
+  document.querySelectorAll('.unit-btn').forEach(b => {
+    // Only toggle buttons inside the countdown tab
+    if (b.getAttribute('onclick') && b.getAttribute('onclick').includes('setCdUnit')) {
+      b.classList.remove('active');
+    }
+  });
+  btn.classList.add('active');
+  updateCountdownTick();
+}
+
+function updateCountdownTick() {
+  if (!countdownTarget) return;
+  const now = Date.now();
+  const diffMs = countdownTarget.getTime() - now;
+
+  const bigEl = document.getElementById('cdBigNumber');
+  const breakEl = document.getElementById('cdBreakdown');
+
+  if (diffMs <= 0) {
+    bigEl.textContent = '0';
+    breakEl.innerHTML = '<div style="color:var(--accent-d);font-size:14px">Arrived ✓</div>';
+    document.getElementById('cdPctLabel').textContent = '100%';
+    document.getElementById('cdFill').style.width = '100%';
+    return;
+  }
+
+  const diffS = diffMs / 1000;
+  const totalDays  = Math.floor(diffS / 86400);
+  const remHours   = Math.floor((diffS % 86400) / 3600);
+  const remMins    = Math.floor((diffS % 3600) / 60);
+  const remSecs    = Math.floor(diffS % 60);
+
+  // Big number in chosen unit
+  let big;
+  switch (cdUnit) {
+    case 'seconds': big = Math.floor(diffS); break;
+    case 'minutes': big = Math.floor(diffS / 60); break;
+    case 'hours':   big = Math.floor(diffS / 3600); break;
+    case 'days':    big = totalDays; break;
+    case 'weeks':   big = Math.floor(diffS / (86400 * 7)); break;
+    case 'months':  big = Math.floor(diffS / (86400 * 30.4375)); break;
+    default:        big = Math.floor(diffS / 60);
+  }
+  bigEl.textContent = big.toLocaleString();
+
+  // Breakdown chips (always d / h / m / s)
+  breakEl.innerHTML = [
+    ['d', totalDays],
+    ['h', remHours],
+    ['m', remMins],
+    ['s', remSecs]
+  ].map(([lbl, num]) => `
+    <div class="cd-chip">
+      <div class="cd-chip-num">${String(num).padStart(2,'0')}</div>
+      <div class="cd-chip-lbl">${lbl}</div>
+    </div>
+  `).join('');
+
+  // Progress bar (% of life from birthday to target)
+  const elapsed = now - birthday.getTime();
+  const total = countdownTarget.getTime() - birthday.getTime();
+  const pct = Math.max(0, Math.min(100, (elapsed / total) * 100));
+  document.getElementById('cdFill').style.width = pct.toFixed(2) + '%';
+  document.getElementById('cdPctLabel').textContent = pct.toFixed(1) + '% of your life';
+}
+const sel = document.getElementById('citySelect');
+CITIES.sort((a,b) => a[0].localeCompare(b[0])).forEach(c => {
+  const o = document.createElement('option');
+  o.value = c[0]; o.textContent = `${c[0]}, ${c[1]} (${c[2]}y)`;
+  o.dataset.exp = c[2];
+  sel.appendChild(o);
+});
+document.getElementById('birthdayInput').max = new Date().toISOString().split('T')[0];
+
+function startWidget() {
+  const bval = document.getElementById('birthdayInput').value;
+  const cval = document.getElementById('citySelect').value;
+  if (!bval) { alert('Please enter your birthday.'); return; }
+  birthday = new Date(bval + 'T00:00:00');
+  if (cval) {
+    const opt = sel.querySelector(`option[value="${cval}"]`);
+    selectedCity = { name: cval, exp: parseFloat(opt.dataset.exp) };
+  } else {
+    selectedCity = { name: 'Global', exp: 72.6 };
+  }
+  document.getElementById('setupScreen').classList.remove('active');
+  document.getElementById('widgetScreen').classList.add('active');
+  initWidget();
+}
+
+function resetWidget() {
+  clearInterval(ticker);
+  document.getElementById('widgetScreen').classList.remove('active');
+  document.getElementById('setupScreen').classList.add('active');
+}
+
+function initWidget() {
+  buildPresets();
+  filterPresets('');
+  updateHeader();
+  updateMilestones();
+  updateCity();
+  tick();
+  clearInterval(ticker);
+  ticker = setInterval(tick, 1000);
+}
+
+function getAgeSeconds() {
+  return (Date.now() - birthday.getTime()) / 1000;
+}
+
+function tick() {
+  const s = getAgeSeconds();
+  updateCounter(s);
+  updateCountdownTick();
+}
+
+function updateHeader() {
+  const years = getAgeSeconds() / (365.25 * 86400);
+  document.getElementById('headerCity').textContent = selectedCity.name;
+  document.getElementById('headerAge').textContent = `${years.toFixed(4)} years old`;
+}
+
+function updateCounter(s) {
+  const years = s / (365.25 * 86400);
+  document.getElementById('headerAge').textContent = `${years.toFixed(6)} years old`;
+  let val, sub;
+  if (currentUnit === 'seconds') { val = Math.floor(s); sub = `${(s/60).toFixed(2)} minutes · ${(s/3600).toFixed(3)} hours`; }
+  else if (currentUnit === 'minutes') { val = Math.floor(s/60); sub = `${(s/3600).toFixed(2)} hours · ${(s/86400).toFixed(3)} days`; }
+  else if (currentUnit === 'hours') { val = Math.floor(s/3600); sub = `${(s/86400).toFixed(2)} days · ${(s/(86400*7)).toFixed(3)} weeks`; }
+  else if (currentUnit === 'days') { val = Math.floor(s/86400); sub = `${(s/(86400*7)).toFixed(2)} weeks · ${(s/(86400*30.44)).toFixed(2)} months`; }
+  else if (currentUnit === 'weeks') { val = Math.floor(s/(86400*7)); sub = `${(s/(86400*30.44)).toFixed(2)} months · ${(s/(86400*365.25)).toFixed(3)} years`; }
+  else if (currentUnit === 'months') { val = Math.floor(s/(86400*30.4375)); sub = `${(s/(86400*365.25)).toFixed(4)} years`; }
+  document.getElementById('counterNumber').textContent = val.toLocaleString();
+  document.getElementById('counterSub').textContent = sub;
+}
+
+let customMilestones = [0,1,5,10,13,16,18,21,25,30,40,50,60,70,80,90,100];
+
+function addMilestone() {
+  const val = parseInt(document.getElementById('milestoneAgeInput').value);
+  if (isNaN(val) || val < 0 || val > 150) return;
+  if (!customMilestones.includes(val)) {
+    customMilestones.push(val);
+    customMilestones.sort((a, b) => a - b);
+  }
+  document.getElementById('milestoneAgeInput').value = '';
+  updateMilestones();
+}
+
+function removeMilestone(age) {
+  customMilestones = customMilestones.filter(a => a !== age);
+  updateMilestones();
+}
+
+function updateMilestones() {
+  const grid = document.getElementById('milestonesGrid');
+  grid.innerHTML = '';
+  const now = Date.now();
+  const ageYears = getAgeSeconds() / (365.25 * 86400);
+
+  // Find the next upcoming milestone
+  const nextAge = customMilestones.find(age => {
+    const t = new Date(birthday.getTime() + age * 365.25 * 86400 * 1000);
+    return t.getTime() > now;
+  });
+
+  customMilestones.forEach(age => {
+    const target = age === 0
+      ? new Date(birthday.getTime())
+      : new Date(birthday.getTime() + age * 365.25 * 86400 * 1000);
+    const diff = target.getTime() - now;
+    const diffDays = Math.floor(Math.abs(diff) / 86400000);
+    const isPast = diff < 0 || age === 0;
+    const isNext = age === nextAge;
+
+    const label = age === 0 ? 'Birth' : `Turn ${age}`;
+    const cls = isPast ? 'past' : (isNext ? 'next' : '');
+
+    const div = document.createElement('div');
+    div.className = 'milestone-item';
+    div.style.position = 'relative';
+    div.innerHTML = `
+      <button onclick="removeMilestone(${age})" style="position:absolute;top:6px;right:6px;background:none;border:none;color:rgba(255,255,255,0.15);cursor:pointer;font-size:11px;padding:0;line-height:1" title="Remove">✕</button>
+      <div class="milestone-age">${isPast && age !== 0 ? '✓ ' : ''}${label}</div>
+      <div class="milestone-days ${cls}">${age === 0 ? birthday.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : diffDays.toLocaleString()}</div>
+      <div class="milestone-sub">${age === 0 ? 'your birthday' : (isPast ? 'days ago' : 'days to go')} · ${target.getFullYear()}</div>
+    `;
+    grid.appendChild(div);
+  });
+
+  const pct = Math.min(100, (ageYears / 100) * 100);
+  document.getElementById('lifeFill').style.width = pct + '%';
+  document.getElementById('lifePercent').textContent = `${pct.toFixed(1)}% of century`;
+}
+
+function updateCity() {
+  const ageSeconds = getAgeSeconds();
+  const ageYears = ageSeconds / (365.25 * 86400);
+  const exp = selectedCity.exp;
+  const pct = Math.min(100, (ageYears / exp) * 100);
+  const yearsLeft = Math.max(0, exp - ageYears);
+  const daysLeft = Math.floor(yearsLeft * 365.25);
+  document.getElementById('cityLifeName').textContent = selectedCity.name;
+  document.getElementById('cityLifeStat').textContent = `Average life expectancy: ${exp} years`;
+  document.getElementById('cityYearsLived').textContent = ageYears.toFixed(1);
+  document.getElementById('cityYearsLeft').textContent = yearsLeft.toFixed(1);
+  document.getElementById('cityDaysLeft').textContent = daysLeft.toLocaleString();
+  document.getElementById('ringPct').textContent = pct.toFixed(1) + '%';
+  const circ = 2 * Math.PI * 68;
+  const offset = circ * (1 - pct / 100);
+  document.getElementById('ringFill').style.strokeDashoffset = offset;
+}
+
+function setUnit(unit, btn) {
+  currentUnit = unit;
+  document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  tick();
+}
+
+function switchTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+  document.getElementById('tab-' + tab).classList.remove('hidden');
+  if (tab === 'milestones') updateMilestones();
+  if (tab === 'city') updateCity();
+}
+
+
+
+</script>
+</body>
+</html>
